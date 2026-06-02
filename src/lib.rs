@@ -20,7 +20,24 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
+use serde::Serialize;
 use serde_json::json;
+
+// ── Structured error detail ───────────────────────────────────────────────────
+
+/// Field-level validation detail for structured error responses.
+///
+/// Used by APIs that return per-field validation failures alongside a top-level
+/// error message. `field` is `None` for non-field errors (e.g. business rule
+/// violations).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApiErrorDetail {
+    pub field: Option<String>,
+    pub message: String,
+}
+
+// ── Simple error type ─────────────────────────────────────────────────────────
 
 #[derive(Debug)]
 pub enum ApiError {
