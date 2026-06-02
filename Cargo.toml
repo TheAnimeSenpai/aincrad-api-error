@@ -3,7 +3,7 @@ name = "aincrad-api-error"
 version = "0.1.0"
 edition = "2021"
 authors = ["Opeyemi Akinnawo <ope.akinnawo@gmail.com>"]
-license = "UNLICENSED"
+license = "MIT"
 description = "Standard Axum API error type with JSON responses"
 
 [dependencies]
