@@ -64,17 +64,13 @@ impl From<anyhow::Error> for ApiError {
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         match self {
-            ApiError::NotFound => (
-                StatusCode::NOT_FOUND,
-                Json(json!({ "error": "not_found" })),
-            )
-                .into_response(),
+            ApiError::NotFound => {
+                (StatusCode::NOT_FOUND, Json(json!({ "error": "not_found" }))).into_response()
+            }
 
-            ApiError::Forbidden => (
-                StatusCode::FORBIDDEN,
-                Json(json!({ "error": "forbidden" })),
-            )
-                .into_response(),
+            ApiError::Forbidden => {
+                (StatusCode::FORBIDDEN, Json(json!({ "error": "forbidden" }))).into_response()
+            }
 
             ApiError::BadRequest(msg) => (
                 StatusCode::BAD_REQUEST,
