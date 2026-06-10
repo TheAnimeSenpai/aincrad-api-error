@@ -15,13 +15,9 @@
 //! }
 //! ```
 
-use axum::{
-    http::StatusCode,
-    response::{IntoResponse, Response},
-    Json,
-};
+use http::StatusCode;
 use serde::Serialize;
-use serde_json::json;
+use serde_json::{json, Value};
 
 // ── Structured error detail ───────────────────────────────────────────────────
 
@@ -61,40 +57,81 @@ impl From<anyhow::Error> for ApiError {
     }
 }
 
-impl IntoResponse for ApiError {
-    fn into_response(self) -> Response {
+impl ApiError {
+    /// Render this error into its HTTP status code and JSON body, independent of
+    /// any web framework. Server-side variants (`Database`, `Internal`) are
+    /// logged here so callers don't have to.
+    ///
+    /// This is the single source of truth for the response contract; the
+    /// feature-gated `IntoResponse` impls delegate to it.
+    pub fn status_and_body(self) -> (StatusCode, Value) {
         match self {
-            ApiError::NotFound => {
-                (StatusCode::NOT_FOUND, Json(json!({ "error": "not_found" }))).into_response()
-            }
-
-            ApiError::Forbidden => {
-                (StatusCode::FORBIDDEN, Json(json!({ "error": "forbidden" }))).into_response()
-            }
-
+            ApiError::NotFound => (StatusCode::NOT_FOUND, json!({ "error": "not_found" })),
+            ApiError::Forbidden => (StatusCode::FORBIDDEN, json!({ "error": "forbidden" })),
             ApiError::BadRequest(msg) => (
                 StatusCode::BAD_REQUEST,
-                Json(json!({ "error": "bad_request", "message": msg })),
-            )
-                .into_response(),
-
+                json!({ "error": "bad_request", "message": msg }),
+            ),
             ApiError::Database(e) => {
                 tracing::error!(error = ?e, "database error");
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({ "error": "internal_error" })),
+                    json!({ "error": "internal_error" }),
                 )
-                    .into_response()
             }
-
             ApiError::Internal(e) => {
                 tracing::error!(error = ?e, "internal error");
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({ "error": "internal_error" })),
+                    json!({ "error": "internal_error" }),
                 )
-                    .into_response()
             }
         }
+    }
+}
+
+// ── axum 0.8 integration ──────────────────────────────────────────────
+
+#[cfg(feature = "axum-08")]
+impl axum_08::response::IntoResponse for ApiError {
+    fn into_response(self) -> axum_08::response::Response {
+        let (status, body) = self.status_and_body();
+        (status, axum_08::Json(body)).into_response()
+    }
+}
+
+// ── axum 0.7 integration ──────────────────────────────────────────────
+
+#[cfg(feature = "axum-07")]
+impl axum_07::response::IntoResponse for ApiError {
+    fn into_response(self) -> axum_07::response::Response {
+        let (status, body) = self.status_and_body();
+        (status, axum_07::Json(body)).into_response()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn not_found_shape() {
+        let (status, body) = ApiError::NotFound.status_and_body();
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body, json!({ "error": "not_found" }));
+    }
+
+    #[test]
+    fn bad_request_carries_message() {
+        let (status, body) = ApiError::BadRequest("bad id".into()).status_and_body();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(body, json!({ "error": "bad_request", "message": "bad id" }));
+    }
+
+    #[test]
+    fn internal_is_opaque() {
+        let (status, body) = ApiError::Internal(anyhow::anyhow!("boom")).status_and_body();
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(body, json!({ "error": "internal_error" }));
     }
 }
