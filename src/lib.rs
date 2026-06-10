@@ -41,6 +41,9 @@ pub enum ApiError {
     Forbidden,
     /// A short message describing the bad input. Sent verbatim in the response.
     BadRequest(String),
+    /// A short message describing the conflicting state (e.g. duplicate
+    /// resource). Sent verbatim in the response with a 409 status.
+    Conflict(String),
     Database(sqlx::Error),
     Internal(anyhow::Error),
 }
@@ -71,6 +74,10 @@ impl ApiError {
             ApiError::BadRequest(msg) => (
                 StatusCode::BAD_REQUEST,
                 json!({ "error": "bad_request", "message": msg }),
+            ),
+            ApiError::Conflict(msg) => (
+                StatusCode::CONFLICT,
+                json!({ "error": "conflict", "message": msg }),
             ),
             ApiError::Database(e) => {
                 tracing::error!(error = ?e, "database error");
@@ -126,6 +133,16 @@ mod tests {
         let (status, body) = ApiError::BadRequest("bad id".into()).status_and_body();
         assert_eq!(status, StatusCode::BAD_REQUEST);
         assert_eq!(body, json!({ "error": "bad_request", "message": "bad id" }));
+    }
+
+    #[test]
+    fn conflict_carries_message() {
+        let (status, body) = ApiError::Conflict("already exists".into()).status_and_body();
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(
+            body,
+            json!({ "error": "conflict", "message": "already exists" })
+        );
     }
 
     #[test]
