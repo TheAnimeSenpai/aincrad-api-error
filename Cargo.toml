@@ -1,15 +1,28 @@
 [package]
 name = "aincrad-api-error"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Opeyemi Akinnawo <ope.akinnawo@gmail.com>"]
 license = "MIT"
-description = "Standard Axum API error type with JSON responses"
+description = "Standard API error type with consistent JSON responses (axum 0.7/0.8)"
 
 [dependencies]
-axum       = { version = "0.8", default-features = false, features = ["json"] }
+http       = "1"
 sqlx       = { version = "0.8", default-features = false }
 anyhow     = "1"
 serde       = { version = "1", features = ["derive"] }
 serde_json = "1"
 tracing    = "0.1"
+
+# axum is optional and feature-gated so the same error type works in both
+# axum 0.7 and axum 0.8 applications. The two are renamed to avoid a name clash.
+axum_08 = { package = "axum", version = "0.8", default-features = false, features = ["json"], optional = true }
+axum_07 = { package = "axum", version = "0.7", default-features = false, features = ["json"], optional = true }
+
+[features]
+# Default targets axum 0.8 to preserve behaviour for existing consumers.
+default = ["axum-08"]
+# IntoResponse impl for axum 0.8.
+axum-08 = ["dep:axum_08"]
+# IntoResponse impl for axum 0.7.
+axum-07 = ["dep:axum_07"]
